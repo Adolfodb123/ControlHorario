@@ -1,0 +1,32 @@
+/* ===== CHECKBOXES CORPORATIVOS COSMEWAX - COLORES DIRECTOS ===== */
+
+/* Estado base del checkbox - color interior y borde */
+.dd-item input[type="checkbox"] {
+    background: white !important;
+    border: 2px solid rgba(88, 117, 135, 0.3) !important;
+}
+
+/* Estado hover - sin marcar */
+.dd-item input[type="checkbox"]:hover {
+    border-color: rgb(88, 117, 135) !important;
+    background: rgba(88, 117, 135, 0.1) !important;
+}
+
+/* Estado marcado */
+.dd-item input[type="checkbox"]:checked {
+    background: linear-gradient(135deg, rgb(88, 117, 135), rgb(73, 101, 118)) !important;
+    border-color: rgb(88, 117, 135) !important;
+    box-shadow: 0 2px 8px rgba(88, 117, 135, 0.25) !important;
+}
+
+/* Estado hover cuando está marcado */
+.dd-item input[type="checkbox"]:checked:hover {
+    background: linear-gradient(135deg, rgb(73, 101, 118), rgb(31, 73, 125)) !important;
+}
+
+
+/* Cuando el checkbox está seleccionado, resaltar ligeramente el item */
+.dd-item:has(input[type="checkbox"]:checked) {
+    background: rgba(88, 117, 135, 0.05) !important;
+    border-left: 3px solid rgb(88, 117, 135) !important;
+}

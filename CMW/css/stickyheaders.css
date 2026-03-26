@@ -1,0 +1,194 @@
+/* ===== STICKY HEADERS CSS ===== */
+/* Headers fijos para tabla de empleados con colores corporativos */
+/* Autor: Jose David | Fecha: 2025 */
+
+/* ===== VARIABLES PARA HEADERS STICKY ===== */
+:root {
+    --header-bg-primary: rgb(88, 117, 135); /* Color corporativo principal */
+    --header-bg-secondary: rgb(73, 101, 118); /* Versión más oscura */
+    --header-text-color: #ffffff;
+    --header-border-color: rgb(73, 101, 118);
+    --header-shadow: 0 2px 8px rgba(88, 117, 135, 0.15);
+    --header-z-index: 100;
+    --sticky-top-offset: 0px;
+}
+
+/* ===== CONTENEDOR PRINCIPAL PARA STICKY ===== */
+.table-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.table-scroll-wrapper {
+    position: relative;
+    overflow: auto;
+    scroll-behavior: smooth;
+}
+
+/* ===== HEADERS STICKY PRINCIPALES ===== */
+table.dataTable thead th {
+    position: sticky !important;
+    top: var(--sticky-top-offset) !important;
+    z-index: var(--header-z-index) !important;
+    background: linear-gradient(135deg, var(--header-bg-primary) 0%, var(--header-bg-secondary) 100%) !important;
+    color: var(--header-text-color) !important;
+    border-bottom: 2px solid var(--header-border-color) !important;
+    box-shadow: var(--header-shadow) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    user-select: none !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+}
+
+/* ===== HOVER EFFECT PARA HEADERS ===== */
+table.dataTable thead th:hover {
+    background: linear-gradient(135deg, rgb(78, 107, 125) 0%, rgb(63, 91, 108) 100%) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(88, 117, 135, 0.25) !important;
+}
+
+/* ===== MÁSCARA SUPERIOR ELIMINADA ===== */
+.table-container::before {
+    display: none !important; /* Eliminada la línea decorativa */
+}
+
+/* ===== SOMBRA DEBAJO DE LOS HEADERS ===== */
+table.dataTable thead::after {
+    content: '';
+    position: sticky;
+    top: calc(var(--sticky-top-offset) + 40px);
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: linear-gradient(180deg, rgba(88, 117, 135, 0.1) 0%, transparent 100%);
+    z-index: calc(var(--header-z-index) - 1);
+    pointer-events: none;
+    margin-bottom: -8px;
+}
+
+/* ===== TEXTO EN HEADERS ===== */
+table.dataTable thead th .header-text {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Sombra para indicar sticky column */
+table.dataTable thead th:first-child::after,
+table.dataTable tbody td:first-child::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -10px;
+    bottom: 0;
+    width: 10px;
+    background: linear-gradient(90deg, rgba(88, 117, 135, 0.1), transparent);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* ===== RESPONSIVE ADJUSTMENTS ===== */
+@media (max-width: 768px) {
+    :root {
+        --header-z-index: 50;
+    }
+    
+    table.dataTable thead th {
+        font-size: 12px !important;
+        padding: 6px 4px !important;
+    }
+    
+    table.dataTable thead th.sorting::after,
+    table.dataTable thead th.sorting_asc::after,
+    table.dataTable thead th.sorting_desc::after {
+        right: 4px !important;
+        font-size: 12px !important;
+    }
+}
+
+/* ===== MODO ALTO CONTRASTE ===== */
+@media (prefers-contrast: high) {
+    :root {
+        --header-bg-primary: rgb(58, 87, 105);
+        --header-bg-secondary: rgb(43, 71, 88);
+        --header-border-color: #000000;
+    }
+    
+    table.dataTable thead th {
+        border: 2px solid #000000 !important;
+    }
+}
+
+/* ===== MODO SIN ANIMACIONES ===== */
+@media (prefers-reduced-motion: reduce) {
+    table.dataTable thead th {
+        transition: none !important;
+    }
+    
+    table.dataTable thead th:hover {
+        transform: none !important;
+    }
+}
+
+/* ===== FORZAR VISIBILIDAD DE HEADERS ===== */
+.table-scroll-wrapper {
+    position: relative !important;
+}
+
+table.dataTable {
+    margin-top: 0 !important;
+}
+
+/* ===== ASEGURAR QUE LOS HEADERS NO SE OCULTEN ===== */
+table.dataTable thead {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: var(--header-z-index) !important;
+}
+
+/* ===== COMPATIBILIDAD CON DATATABLES ===== */
+.dataTables_scrollHead {
+    display: none !important; /* Ocultar header duplicado de DataTables */
+}
+
+.dataTables_scrollBody {
+    border-top: none !important;
+}
+
+/* ===== ESTADOS ACTIVOS CON COLORES CORPORATIVOS ===== */
+table.dataTable thead th.sorting_asc,
+table.dataTable thead th.sorting_desc {
+    background: linear-gradient(135deg, 
+        rgba(88, 117, 135, 1) 0%, 
+        rgba(73, 101, 118, 1) 50%,
+        rgba(98, 127, 145, 1) 100%) !important;
+    color: #ffffff !important;
+    font-weight: 700 !important;
+}
+
+/* ===== MEJORA VISUAL PARA HOVER ===== */
+table.dataTable thead th:hover {
+    background: linear-gradient(135deg, 
+        rgba(78, 107, 125, 1) 0%, 
+        rgba(63, 91, 108, 1) 50%,
+        rgba(88, 117, 135, 1) 100%) !important;
+}
+
+/* ===== DEBUG MODE (descomenta para ver bordes) ===== */
+/*
+table.dataTable thead th {
+    outline: 2px solid red !important;
+}
+
+.table-container {
+    outline: 2px solid blue !important;
+}
+
+.table-scroll-wrapper {
+    outline: 2px solid green !important;
+}
+*/

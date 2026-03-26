@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -c \"mysqli\\\\|mysql_\\\\|PDO\\\\|$conn\\\\|query\" \"c:/xampp/htdocs/ControlHorarioCMW-Test-2/CMW/index.php\")",
+      "Read(//c/xampp/**)",
+      "Bash(mysql -u root -e \"SHOW DATABASES;\")",
+      "Bash(/c/xampp/mysql/bin/mysql -u root -e \"SHOW DATABASES;\")",
+      "Bash(/c/xampp/mysql/bin/mysql -u root controlhorario_cmw -e \"SHOW TABLES; SELECT COUNT\\(*\\) as ''Filas en empleados_anual'' FROM empleados_anual; SELECT COUNT\\(*\\) as ''Filas en empleados_resumen'' FROM empleados_resumen;\")",
+      "Bash(/c/xampp/mysql/bin/mysql -u root controlhorario_cmw -e \":*)",
+      "Bash(/c/xampp/mysql/bin/mysql -u root controlhorario_cmw -e \"ALTER TABLE empleados_anual DISCARD TABLESPACE;\")",
+      "Bash(/c/xampp/mysql/bin/mysql -u root controlhorario_cmw -e \"ALTER TABLE empleados_resumen DISCARD TABLESPACE;\")",
+      "Bash(/c/xampp/php/php.exe import_excel_to_db.php --truncate)",
+      "Bash(/c/xampp/mysql/bin/mysql -u root controlhorario_cmw --default-character-set=utf8mb4 -e \":*)",
+      "Bash(/c/xampp/mysql/bin/mysql -u root controlhorario_cmw --default-character-set=utf8mb4 -e \"SELECT DISTINCT dia_semana, HEX\\(dia_semana\\) FROM empleados_anual;\")"
+    ]
+  }
+}

@@ -1,0 +1,204 @@
+/* view-buttons.css - Estilos específicos SOLO para los botones de cambio de vista */
+
+/* Contenedor de botones de vista */
+.view-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* SOLO los botones con clase .view-btn (no todos los botones) */
+.view-buttons .view-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--view-btn-bg);
+    border: 1px solid var(--view-btn-border);
+    border-radius: 6px;
+    color: var(--view-btn-text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    user-select: none;
+}
+
+.view-buttons .view-btn:hover {
+    background: var(--view-btn-hover-bg);
+    border-color: var(--view-btn-hover-border);
+    color: var(--view-btn-hover-text);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(88, 117, 135, 0.15);
+}
+
+.view-buttons .view-btn.active {
+    background: var(--view-btn-active-bg);
+    border-color: var(--view-btn-active-border);
+    color: white;
+    box-shadow: 0 2px 4px rgba(88, 117, 135, 0.25);
+}
+
+.view-buttons .view-btn.active:hover {
+    background: var(--view-btn-active-hover-bg);
+    border-color: var(--view-btn-active-hover-bg);
+    color: white;
+}
+
+.view-buttons .view-btn i {
+    font-size: 14px;
+    width: 14px;
+    text-align: center;
+}
+
+.view-buttons .view-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(88, 117, 135, 0.25);
+}
+
+.view-buttons .view-btn:active {
+    transform: translateY(0);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .view-buttons {
+        gap: 4px;
+    }
+    
+    .view-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    .view-btn span:not(.fa):not(.fas) {
+        display: none;
+    }
+    
+    .view-btn i {
+        margin-right: 0;
+    }
+}
+
+/* Ajustes para el header container */
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-container h1 {
+    margin: 0;
+    flex: 1;
+}
+
+.header-container .view-buttons {
+    flex-shrink: 0;
+}
+
+/* Variables CSS con colores corporativos */
+:root {
+    /* Colores corporativos basados en la paleta (RGB 88,117,135) */
+    --corporate-primary: rgb(88, 117, 135);     /* Color principal */
+    --corporate-secondary: rgb(73, 101, 118);   /* Color más oscuro */
+    --corporate-light: #e8ecef;                 /* Tono claro para fondos */
+    --corporate-border: rgba(88, 117, 135, 0.3); /* Bordes suaves */
+    
+    /* Estados para botones de vista */
+    --view-btn-bg: #f8f9fa;
+    --view-btn-border: var(--corporate-border);
+    --view-btn-text: var(--corporate-primary);
+    --view-btn-hover-bg: var(--corporate-light);
+    --view-btn-hover-border: var(--corporate-primary);
+    --view-btn-hover-text: var(--corporate-secondary);
+    --view-btn-active-bg: var(--corporate-primary);
+    --view-btn-active-border: var(--corporate-primary);
+    --view-btn-active-hover-bg: var(--corporate-secondary);
+}
+
+.filter-tag {
+    font-size: 11px;
+    padding: 2px 6px;
+    margin: 1px;
+}
+
+
+
+.filter-tag {
+    display: inline-flex;
+    align-items: center;
+    background: #4a90e2;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    max-width: 200px;
+}
+
+.filter-tag-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.filter-tag-remove {
+    margin-left: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    background: rgba(255,255,255,0.3);
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+}
+
+.filter-tag-remove:hover {
+    background: rgba(255,255,255,0.5);
+}
+
+.dd-panel .filter-tags {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    max-height: 60px; /* Altura máxima más pequeña */
+    overflow-y: auto;
+    background: #f8f9fa; /* Fondo ligeramente diferente para distinguir */
+}
+
+.dd-panel .filter-tags:empty {
+    display: none;
+}
+
+.dd-panel .filter-tags + .dd-list {
+    /* Asegurar que la lista mantenga su altura */
+    max-height: calc(300px - 100px); /* Ajusta según tu diseño */
+    overflow-y: auto;
+}
+
+/* ===== FILTER TAGS CORPORATIVOS ===== */
+
+.filter-tag-remove {
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    background: rgb(88, 117, 135) !important;
+    color: white !important;
+    border: 1px solid rgb(73, 101, 118) !important;
+}
+
+.filter-tag {
+    transition: opacity 0.2s ease-out;
+    background: linear-gradient(135deg, rgb(88, 117, 135), rgb(73, 101, 118)) !important;
+    color: white !important;
+    border: 1px solid rgb(88, 117, 135) !important;
+}
+
+.filter-tag.removing {
+    opacity: 0;
+    transform: scale(0.8);
+}

@@ -1,0 +1,182 @@
+/* === FILA DE TOTALES === */
+
+.totals-row {
+    position: static;
+    z-index: 100;
+    background: linear-gradient(135deg, #587587 0%, #6B8A9A 100%);
+    border-bottom: 3px solid #1F49A3;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    margin: 10px 0 0 0;
+    padding: 0;
+    transition: all 0.3s ease;
+    border-radius: 8px;
+}
+
+.totals-row.hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+}
+
+.totals-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 12px 20px;
+    gap: 25px;
+    flex-wrap: wrap;
+    min-height: 50px;
+}
+
+.totals-label {
+    font-weight: bold;
+    font-size: 14px;
+    color: #ecf0f1;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.totals-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(31, 73, 163, 0.15);
+    padding: 8px 14px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: all 0.2s ease;
+}
+
+.totals-item:hover {
+    background: rgba(31, 73, 163, 0.25);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+}
+
+.totals-item-label {
+    font-size: 12px;
+    color: #bdc3c7;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.totals-value {
+    font-size: 16px;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    min-width: 60px;
+    text-align: center;
+}
+
+.totals-value.exceso {
+    color: #000000;
+}
+
+.totals-value.faltante {
+    color: #000000;
+}
+
+.totals-toggle {
+    margin-left: auto;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #ecf0f1;
+    padding: 8px 12px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.totals-toggle:hover {
+    background: rgba(255,255,255,0.2);
+    transform: scale(1.1);
+}
+
+.totals-toggle i {
+    font-size: 14px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .totals-container {
+        padding: 10px 15px;
+        gap: 15px;
+    }
+    
+    .totals-label {
+        font-size: 12px;
+        margin-right: 5px;
+    }
+    
+    .totals-item {
+        padding: 6px 10px;
+        gap: 6px;
+    }
+    
+    .totals-item-label {
+        font-size: 11px;
+    }
+    
+    .totals-value {
+        font-size: 14px;
+        min-width: 50px;
+    }
+    
+    .totals-toggle {
+        width: 35px;
+        height: 35px;
+    }
+}
+
+@media (max-width: 480px) {
+    .totals-container {
+        gap: 10px;
+        padding: 8px 12px;
+    }
+    
+    .totals-item {
+        flex-direction: column;
+        gap: 2px;
+        padding: 6px 8px;
+        text-align: center;
+        min-width: 70px;
+    }
+    
+    .totals-item-label {
+        font-size: 10px;
+        line-height: 1;
+    }
+    
+    .totals-value {
+        font-size: 13px;
+        min-width: auto;
+    }
+}
+
+/* Animación suave para la aparición */
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.totals-row {
+    animation: slideDown 0.4s ease-out;
+}

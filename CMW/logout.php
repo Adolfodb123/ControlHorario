@@ -26,6 +26,6 @@ header('Pragma: no-cache');
 header('Expires: 0');
 
 // Redirigir al login
-header('Location: ../login.html');
+header('Location: /ControlHorarioCMW-Test-2/login.php');
 exit;
 ?>

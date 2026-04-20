@@ -232,6 +232,21 @@ table.dataTable thead th {
     text-align: center;
 }
 
+/* === BADGES DE HORARIO === */
+.time-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 0.82em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+.time-ok       { background: #d4edda; color: #155724; }   /* Puntual */
+.time-late     { background: #f8d7da; color: #721c24; }   /* Tarde / salida anticipada */
+.time-overtime { background: #cce5ff; color: #004085; }   /* Horas extra */
+.time-empty    { color: #bbb; font-size: 0.8em; }
+
 .col-number-small {
     min-width: 55px;
     width: 65px;

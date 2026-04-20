@@ -13,8 +13,10 @@ class ViewManager {
                 columnDefs: [
                     { targets: 1, className: 'col-date-small', width: 100,
                       render: (d,t) => (t==='sort'||t==='type') ? this.isoFromSqlDate(d) : this.displayDMY(d) },
-                    { targets: [3,4], className: 'col-time-small', width: 75,
-                      render: (d,t) => (t==='sort'||t==='type') ? this.timeHHMMSS(d) : (this.timeHHMMSS(d).substring(0,5)||'00:00') },
+                    { targets: 3, className: 'col-time-small', width: 85,
+                      render: (d,t) => (t==='sort'||t==='type') ? this.timeHHMMSS(d) : this.renderTimeBadge(d, 'entrada') },
+                    { targets: 4, className: 'col-time-small', width: 85,
+                      render: (d,t) => (t==='sort'||t==='type') ? this.timeHHMMSS(d) : this.renderTimeBadge(d, 'salida') },
                     // COLUMNAS DE HORAS AGRUPADAS (7, 8, 9)
                     { targets: [7,8,9], className: 'col-time-small', width: 75,
                       render: (d,t) => { const n=Number(d)||0; return (t==='sort'||t==='type')? n : this.minutosAHHMM(n); } },
@@ -54,9 +56,6 @@ class ViewManager {
             <div class="view-buttons" id="view-buttons">
                 <button id="btn-vista-general" class="view-btn active" data-view="general">
                     <i class="fas fa-table"></i> Vista General
-                </button>
-                <button id="btn-vista-resumen" class="view-btn" data-view="resumen">
-                    <i class="fas fa-list"></i> Vista Resumen
                 </button>
             </div>
         `;
@@ -335,6 +334,37 @@ class ViewManager {
         if (!val) return '00:00:00';
         const t = String(val).includes(' ') ? String(val).split(' ')[1] : String(val);
         return t.length === 5 ? (t + ':00') : t;
+    }
+
+    // Convierte "HH:MM:SS" o "HH:MM" a minutos desde medianoche
+    timeToMinutes(val) {
+        if (!val) return null;
+        const t = String(val).trim().split(':');
+        if (t.length < 2) return null;
+        return parseInt(t[0], 10) * 60 + parseInt(t[1], 10);
+    }
+
+    // Renderiza un badge de color según si la hora es puntual, tarde o con horas extra
+    // Referencia horario: entrada 07:00, salida 15:00
+    // Tolerancia: ±15 min considerada "normal"
+    renderTimeBadge(val, tipo) {
+        const hhmm = this.timeHHMMSS(val).substring(0, 5);
+        if (!val || hhmm === '00:00') return '<span class="time-empty">—</span>';
+
+        const min = this.timeToMinutes(hhmm);
+        let cls = 'time-ok';
+
+        if (tipo === 'entrada') {
+            // Tarde si llega después de 07:15 (7*60+15 = 435)
+            if (min > 435) cls = 'time-late';
+        } else {
+            // Salida anticipada si sale antes de 14:45 (14*60+45 = 885)
+            if (min < 885) cls = 'time-late';
+            // Horas extra si sale después de 15:30 (15*60+30 = 930)
+            else if (min > 930) cls = 'time-overtime';
+        }
+
+        return `<span class="time-badge ${cls}">${hhmm}</span>`;
     }
 
     toBool01(x) {

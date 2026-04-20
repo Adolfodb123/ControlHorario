@@ -1,15 +1,12 @@
 <?php
-// ===== ARCHIVO: auth_check.php =====
+// ===== auth_check.php =====
 
 declare(strict_types=1);
 
-// --- Config ---
-$WEB = "ControlHorarioCMW-Test-2"; // <-- actualizado al nombre de la carpeta
-
-$ALLOWED_GROUPS = ['ControlHorario']; // ajusta según tu caso
+$WEB = "ControlHorarioCMW-Test-2";
+$ALLOWED_GROUPS  = ['ControlHorario'];
 $SESSION_TIMEOUT = 7200; // 2 horas
 
-// --- Seguridad de cookies de sesión (antes de session_start) ---
 $cookieParams = session_get_cookie_params();
 session_set_cookie_params([
     'lifetime' => 0,
@@ -20,7 +17,6 @@ session_set_cookie_params([
     'samesite' => 'Lax',
 ]);
 
-// --- No cache en contenido protegido ---
 if (!headers_sent()) {
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
@@ -33,7 +29,6 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 function redirect_and_exit(string $path): void {
     global $WEB;
-    // Si quieres redirigir luego a la página original:
     if (!isset($_SESSION['login_redirect'])) {
         $_SESSION['login_redirect'] = $_SERVER['REQUEST_URI'] ?? '/';
     }
@@ -58,18 +53,15 @@ function destroy_session(): void {
 function verificar_autenticacion(): bool {
     global $ALLOWED_GROUPS, $SESSION_TIMEOUT;
 
-    // ¿logueado?
     if (empty($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
         redirect_and_exit('login.html');
     }
 
-    // ¿usuario válido?
     if (empty($_SESSION['user'])) {
         destroy_session();
         redirect_and_exit('login.html');
     }
 
-    // Timeout de sesión
     $now = time();
     if (isset($_SESSION['last_activity']) && ($now - (int)$_SESSION['last_activity'] > $SESSION_TIMEOUT)) {
         destroy_session();
@@ -78,7 +70,6 @@ function verificar_autenticacion(): bool {
     }
     $_SESSION['last_activity'] = $now;
 
-    // Comprobación de grupo
     if (empty($_SESSION['user_group']) || !in_array($_SESSION['user_group'], $ALLOWED_GROUPS, true)) {
         redirect_and_exit('sin_permisos.html');
     }
@@ -86,5 +77,22 @@ function verificar_autenticacion(): bool {
     return true;
 }
 
-// Ejecutar check
-verificar_autenticacion();
+function requerir_rol_admin(): void {
+    verificar_autenticacion();
+    if (($_SESSION['role'] ?? '') !== 'admin') {
+        redirect_and_exit('sin_permisos.html');
+    }
+}
+
+function requerir_rol_empleado(): void {
+    verificar_autenticacion();
+    if (($_SESSION['role'] ?? '') !== 'empleado') {
+        // Si es admin, redirigir a su interfaz
+        if (($_SESSION['role'] ?? '') === 'admin') {
+            global $WEB;
+            header("Location: /{$WEB}/CMW/index.php");
+            exit;
+        }
+        redirect_and_exit('sin_permisos.html');
+    }
+}

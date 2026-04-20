@@ -100,21 +100,26 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // ===== Acciones (Actualizar datos / Logout) =====
-    function actualizarDatos() {
+    async function actualizarDatos() {
         const state = setLoadingState(updateDataBtn, 'Actualizando...');
-        fetch('ejecutar_script.php', { method:'POST', headers:{'Content-Type':'application/json'} })
-          .then(r=>r.json())
-          .then(data=>{
-            if (data?.success) {
-                mostrarNotificacion('Datos actualizados correctamente','success');
-                setTimeout(()=>{ (typeof cargarDatos==='function') ? cargarDatos() : window.location.reload(); }, 1200);
+        try {
+            await fetch('api/sync_dias.php');
+            if (typeof window.cargarDatosIniciales === 'function') {
+                await window.cargarDatosIniciales();
             } else {
-                mostrarNotificacion('Error al actualizar datos: ' + (data?.error || 'Desconocido'),'error');
-                if (data?.output) console.error('Output:', data.output);
+                window.location.reload();
+                return;
             }
-          })
-          .catch(err=>{ console.error(err); mostrarNotificacion('Error de conexión al actualizar datos','error'); })
-          .finally(()=> state.restore());
+            if (typeof window.actualizarBadgeSolicitudes === 'function') {
+                await window.actualizarBadgeSolicitudes();
+            }
+            mostrarNotificacion('Datos actualizados correctamente', 'success');
+        } catch(err) {
+            console.error(err);
+            mostrarNotificacion('Error de conexión al actualizar datos', 'error');
+        } finally {
+            state.restore();
+        }
     }
     function logout() {
         if (!logoutBtn) { window.location.href='logout.php'; return; }

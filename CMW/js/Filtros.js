@@ -74,6 +74,28 @@ function timeHHMMSS(val) {
     return t.length === 5 ? (t + ':00') : t;
 }
 
+function timeToMinutes(val) {
+    if (!val) return null;
+    const t = String(val).trim().split(':');
+    if (t.length < 2) return null;
+    return parseInt(t[0], 10) * 60 + parseInt(t[1], 10);
+}
+
+// Renderiza badge de color según horario (entrada 07:00, salida 15:00, tolerancia ±15 min)
+function renderTimeBadge(val, tipo) {
+    const hhmm = timeHHMMSS(val).substring(0, 5);
+    if (!val || hhmm === '00:00') return '<span class="time-empty">—</span>';
+    const min = timeToMinutes(hhmm);
+    let cls = 'time-ok';
+    if (tipo === 'entrada') {
+        if (min > 435) cls = 'time-late';            // > 07:15 → tarde
+    } else {
+        if (min < 885) cls = 'time-late';            // < 14:45 → salida anticipada
+        else if (min > 930) cls = 'time-overtime';   // > 15:30 → horas extra
+    }
+    return `<span class="time-badge ${cls}">${hhmm}</span>`;
+}
+
 function toBool01(x) {
     const s = String(x).trim().toLowerCase();
     return (x === 1 || x === true || s === '1' || s === 'si' || s === 'sí' || s === 'yes') ? 1 : 0;
@@ -206,7 +228,10 @@ function poblarFiltrosInteligentes() {
 // Cargar datos iniciales (sin filtros aplicados)
 function cargarDatosIniciales() {
     const limite = $('#limite-registros').val();
-    
+
+    // Generar filas vacías para días laborables sin fichaje
+    fetch('api/sync_dias.php', { method: 'GET' }).catch(() => {});
+
     showPageLoading('Cargando datos iniciales...');
     $('#error-container').hide();
 
@@ -665,8 +690,10 @@ $(document).ready(function () {
             { targets: 1, className: 'col-date-small',  width: 100,
             render: (d,t)=> (t==='sort'||t==='type') ? isoFromSqlDate(d) : displayDMY(d) },
 
-            { targets: [3,4], className: 'col-time-small', width: 75,
-            render: (d,t)=> (t==='sort'||t==='type') ? timeHHMMSS(d) : (timeHHMMSS(d).substring(0,5)||'00:00') },
+            { targets: 3, className: 'col-time-small', width: 85,
+            render: (d,t)=> (t==='sort'||t==='type') ? timeHHMMSS(d) : renderTimeBadge(d, 'entrada') },
+            { targets: 4, className: 'col-time-small', width: 85,
+            render: (d,t)=> (t==='sort'||t==='type') ? timeHHMMSS(d) : renderTimeBadge(d, 'salida') },
 
             // CORREGIDO: columnas 7, 8, 9 para horas
             { targets: [7,8,9], className: 'col-time-small', width: 75,

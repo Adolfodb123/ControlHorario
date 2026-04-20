@@ -8,7 +8,7 @@ class DatabaseConfig {
             "user" => "root",
             "password" => "",
             "database" => "controlhorario_cmw",
-            "charset" => "utf8"
+            "charset" => "utf8mb4"
         );
     }
 

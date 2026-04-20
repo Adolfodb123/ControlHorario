@@ -2,7 +2,8 @@
 //ESTO ES Index.php REFACTORIZADO - JavaScript del menú movido a archivo separado
 
 // Index.php mi pagina principal
-require_once '../auth_check.php'; 
+require_once '../auth_check.php';
+requerir_rol_admin();
 
 // Cargar configuración de permisos
 require_once 'user-permissions.php';
@@ -36,7 +37,7 @@ function conectarBD() {
         error_log("Error de conexión MySQL: " . $conn->connect_error);
         throw new Exception("Error de conexión a la base de datos");
     }
-    $conn->set_charset("utf8");
+    $conn->set_charset("utf8mb4");
     return $conn;
 }
 
@@ -128,13 +129,19 @@ function obtenerDatosFiltrados($filtros = [], $limite = 1000) {
             full_name,
             date,
             dia_semana,
-            clock_in,
-            clock_out,
+            COALESCE(clock_in,  IF(horas > 0 AND DAYOFWEEK(date) NOT IN (1,7), '07:00:00', NULL)) AS clock_in,
+            COALESCE(clock_out, IF(horas > 0 AND DAYOFWEEK(date) NOT IN (1,7), SEC_TO_TIME(25200 + ROUND(horas * 3600)), NULL)) AS clock_out,
             '' AS role_name,
             Equipo,
-            CASE WHEN DAYOFWEEK(date) IN (1,7) THEN 0 ELSE COALESCE(TIME_TO_SEC(TIMEDIFF(clock_out, clock_in)) / 60, COALESCE(horas, 0) * 60) END AS minutos_trabajados,
-            CASE WHEN DAYOFWEEK(date) IN (1,7) THEN 0 ELSE GREATEST(0, COALESCE(TIME_TO_SEC(TIMEDIFF(clock_out, clock_in)) / 60, COALESCE(horas, 0) * 60) - 480) END AS exceso_min,
-            CASE WHEN DAYOFWEEK(date) IN (1,7) THEN 0 ELSE GREATEST(0, 480 - COALESCE(TIME_TO_SEC(TIMEDIFF(clock_out, clock_in)) / 60, COALESCE(horas, 0) * 60)) END AS faltantes_min,
+            CASE WHEN DAYOFWEEK(date) IN (1,7) THEN 0
+                 ELSE COALESCE(TIME_TO_SEC(TIMEDIFF(clock_out, clock_in)) / 60, COALESCE(horas, 0) * 60)
+            END AS minutos_trabajados,
+            CASE WHEN DAYOFWEEK(date) IN (1,7) OR Festivo = 'Sí' THEN 0
+                 ELSE GREATEST(0, COALESCE(TIME_TO_SEC(TIMEDIFF(clock_out, clock_in)) / 60, COALESCE(horas, 0) * 60) - 480)
+            END AS exceso_min,
+            CASE WHEN DAYOFWEEK(date) IN (1,7) OR Festivo = 'Sí' OR Justificado = 'Sí' THEN 0
+                 ELSE GREATEST(0, 480 - COALESCE(TIME_TO_SEC(TIMEDIFF(clock_out, clock_in)) / 60, COALESCE(horas, 0) * 60))
+            END AS faltantes_min,
             Festivo,
             Justificado
         FROM empleados_anual
@@ -482,226 +489,77 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
                 echo json_encode(['error' => true, 'message' => 'Excepción al obtener el resumen mensual']);
                 exit;
             }
-        // ===== EXPORTACIÓN MÍNIMA DESDE TUS DATOS (todo TEXTO) =====
+        // ===== EXPORTACIÓN SpreadsheetML (compatible PHP 8.0) =====
         case 'export_excel':
             try {
-                // FORZAR 'ALL' para exportación completa
-                $limite  = 'ALL';  // En lugar de $_GET['limite'] ?? 'ALL';
                 $filtros = isset($_GET['filtros']) ? json_decode($_GET['filtros'], true) : [];
-
-                // Obtener datos de vista general
-                $datosGeneral = obtenerDatosFiltrados($filtros, $limite);
-                if (isset($datosGeneral['error']) && $datosGeneral['error']) {
-                    throw new Exception($datosGeneral['message']);
+                $datos   = obtenerDatosFiltrados($filtros, 'ALL');
+                if (isset($datos['error']) && $datos['error']) {
+                    throw new Exception($datos['message']);
                 }
 
-                // Obtener datos de resumen mensual
-                $datosResumen = obtenerDatosResumenMensual($filtros, $limite);
-                if (isset($datosResumen['error']) && $datosResumen['error']) {
-                    throw new Exception($datosResumen['message']);
-                }
+                if (ob_get_length()) ob_end_clean();
 
-                if (ob_get_length()) { ob_end_clean(); }
-                require_once dirname(__DIR__) . '/vendor/autoload.php';
-
-                // Crear libro con dos hojas
-                $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
-
-                // ===== HOJA 1: VISTA GENERAL =====
-                $sheetGeneral = $spreadsheet->getActiveSheet();
-                $sheetGeneral->setTitle('Vista General');
-
-                // Definición de columnas para vista general - NUEVO ORDEN
-                $headersGeneral = [
-                    'Nombre Completo' => 'full_name',
-                    'Fecha'           => 'date',
-                    'Día Semana'      => 'dia_semana',
-                    'Entrada'         => 'clock_in',
-                    'Salida'          => 'clock_out',
-                    'Rol'             => 'role_name',
-                    'Equipo'          => 'Equipo',
-                    'H. Trabajados'   => 'minutos_trabajados',  // Posición 7
-                    'Exceso H.'       => 'exceso_min',         // Posición 8
-                    'Faltantes H.'    => 'faltantes_min',      // Posición 9
-                    'Festivo'         => 'Festivo',            // Posición 10
-                    'Justificado'     => 'Justificado',        // Posición 11
-                ];
-
-                // Helpers compartidos
-                $toMinutes = function($v) {
-                    if ($v === null || $v === '') return 0.0;
-                    if (is_numeric($v)) return (float)$v;
-                    $s = trim((string)$v);
-                    if (preg_match('/^(\d+):(\d{2})(?::(\d{2}))?$/', $s, $m)) {
-                        $h = (int)$m[1];
-                        $m2 = (int)$m[2];
-                        $sec = isset($m[3]) ? (int)$m[3] : 0;
-                        return $h * 60 + $m2 + ($sec / 60.0);
-                    }
-                    return 0.0;
-                };
-                $minToExcel = function($mins) {
-                    $m = is_numeric($mins) ? (float)$mins : 0.0;
-                    return $m / 1440.0;
+                $minToHHMM = function($v) {
+                    $m = is_numeric($v) ? (int)round((float)$v) : 0;
+                    return sprintf('%02d:%02d', intdiv($m, 60), $m % 60);
                 };
                 $boolSiNo = function($v) {
                     $s = strtolower(trim((string)$v));
-                    return in_array($s, ['1','si','sí','yes','true','y','t']) ? 'Sí' : 'No';
+                    return in_array($s, ['1','si','sí','yes','true']) ? 'Sí' : 'No';
                 };
-                $hhmmToExcel = function($v) {
-                    if (empty($v)) return 0.0;
-                    $s = trim((string)$v);
-                    if (preg_match('/^(\d+):(\d{2})$/', $s, $m)) {
-                        $h = (int)$m[1];
-                        $min = (int)$m[2];
-                        return ($h * 60 + $min) / 1440.0;
-                    }
-                    return 0.0;
+                $timeHHMM = function($v) {
+                    if (!$v) return '';
+                    return substr((string)$v, 0, 5);
                 };
+                $esc = fn($s) => htmlspecialchars((string)$s, ENT_XML1, 'UTF-8');
 
-                // Cabeceras vista general
-                $c = 1;
-                foreach (array_keys($headersGeneral) as $h) {
-                    $sheetGeneral->setCellValueByColumnAndRow($c++, 1, $h);
-                }
-
-                // Datos vista general
-                $r = 2;
-                // Y luego en la parte donde llenas los datos:
-                foreach ($datosGeneral as $fila) {
-                    $c = 1;
-                    $sheetGeneral->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersGeneral['Nombre Completo']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    
-                    $dateStr = $fila[$headersGeneral['Fecha']] ?? '';
-                    if ($dateStr) {
-                        $dt = new \DateTime(substr((string)$dateStr, 0, 10));
-                        $sheetGeneral->setCellValueByColumnAndRow($c, $r, \PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel($dt));
-                    } else {
-                        $sheetGeneral->setCellValueByColumnAndRow($c, $r, null);
-                    }
-                    $c++;
-
-                    $sheetGeneral->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersGeneral['Día Semana']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheetGeneral->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersGeneral['Entrada']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheetGeneral->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersGeneral['Salida']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheetGeneral->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersGeneral['Rol']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheetGeneral->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersGeneral['Equipo']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    
-                    // HORAS AGRUPADAS: Trabajados, Exceso, Faltantes
-                    $sheetGeneral->setCellValueByColumnAndRow($c++, $r, $minToExcel($toMinutes($fila[$headersGeneral['H. Trabajados']] ?? 0)));
-                    $sheetGeneral->setCellValueByColumnAndRow($c++, $r, $minToExcel($toMinutes($fila[$headersGeneral['Exceso H.']] ?? 0)));
-                    $sheetGeneral->setCellValueByColumnAndRow($c++, $r, $minToExcel($toMinutes($fila[$headersGeneral['Faltantes H.']] ?? 0)));
-                    
-                    // Y al final: Festivo y Justificado
-                    $sheetGeneral->setCellValueExplicitByColumnAndRow($c++, $r, $boolSiNo($fila[$headersGeneral['Festivo']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheetGeneral->setCellValueExplicitByColumnAndRow($c++, $r, $boolSiNo($fila[$headersGeneral['Justificado']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $r++;
-                }
-
-
-                // También actualizar el formateo de columnas:
-                $lastRowGeneral = max($r - 1, 2);
-                $lastColGeneralLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headersGeneral));
-
-                $sheetGeneral->getStyle("B2:B{$lastRowGeneral}")->getNumberFormat()->setFormatCode('yyyy-mm-dd');
-                // HORAS TRABAJADAS, EXCESO Y FALTANTES AHORA EN COLUMNAS H, I, J
-                $sheetGeneral->getStyle("H2:H{$lastRowGeneral}")->getNumberFormat()->setFormatCode('[h]:mm'); // H. Trabajados
-                $sheetGeneral->getStyle("I2:I{$lastRowGeneral}")->getNumberFormat()->setFormatCode('[h]:mm'); // Exceso
-                $sheetGeneral->getStyle("J2:J{$lastRowGeneral}")->getNumberFormat()->setFormatCode('[h]:mm'); // Faltantes
-                // FESTIVO Y JUSTIFICADO AHORA EN K Y L
-                $sheetGeneral->getStyle("K2:K{$lastRowGeneral}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-                $sheetGeneral->getStyle("L2:L{$lastRowGeneral}")->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
-                
-                // Cabeceras vista general
-                $sheetGeneral->getStyle("A1:{$lastColGeneralLetter}1")->getFont()->setBold(true);
-                $sheetGeneral->getStyle("A1:{$lastColGeneralLetter}1")->getFill()
-                    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
-                    ->getStartColor()->setARGB('FFEAEFF5');
-
-                // Autosize columnas vista general
-                for ($i = 1; $i <= count($headersGeneral); $i++) {
-                    $sheetGeneral->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
-                }
-
-                $sheetGeneral->freezePane('A2');
-                $sheetGeneral->setAutoFilter("A1:{$lastColGeneralLetter}{$lastRowGeneral}");
-
-                // ===== HOJA 2: RESUMEN MENSUAL =====
-                $sheetResumen = $spreadsheet->createSheet();
-                $sheetResumen->setTitle('Resumen Mensual');
-
-                // Definición de columnas para resumen mensual
-                $headersResumen = [
-                    'Empleado'             => 'nombre_empleado',
-                    'Equipo'               => 'Equipo',
-                    'Mes'                  => 'nombre_mes',
-                    'Total días'           => 'total_dias_mes',
-                    'Días trabajados'      => 'dias_trabajados',
-                    'Laborables teóricos'  => 'dias_laborables_teoricos',
-                    'Festivos'            => 'dias_festivos',
-                    'Permisos'            => 'dias_permiso',
-                    'H. Trabajadas'       => 'horas_trabajadas_hhMM',
-                    'H. Exceso'           => 'horas_exceso_hhMM',
-                    'H. Faltantes'        => 'horas_faltantes_hhMM',
-                ];
-
-                // Cabeceras resumen mensual
-                $c = 1;
-                foreach (array_keys($headersResumen) as $h) {
-                    $sheetResumen->setCellValueByColumnAndRow($c++, 1, $h);
-                }
-
-                // Datos resumen mensual
-                $r = 2;
-                foreach ($datosResumen as $fila) {
-                    $c = 1;
-                    $sheetResumen->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersResumen['Empleado']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheetResumen->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersResumen['Equipo']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheetResumen->setCellValueExplicitByColumnAndRow($c++, $r, (string)($fila[$headersResumen['Mes']] ?? ''), \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-                    $sheetResumen->setCellValueByColumnAndRow($c++, $r, (int)($fila[$headersResumen['Total días']] ?? 0));
-                    $sheetResumen->setCellValueByColumnAndRow($c++, $r, (int)($fila[$headersResumen['Días trabajados']] ?? 0));
-                    $sheetResumen->setCellValueByColumnAndRow($c++, $r, (int)($fila[$headersResumen['Laborables teóricos']] ?? 0));
-                    $sheetResumen->setCellValueByColumnAndRow($c++, $r, (int)($fila[$headersResumen['Festivos']] ?? 0));
-                    $sheetResumen->setCellValueByColumnAndRow($c++, $r, (int)($fila[$headersResumen['Permisos']] ?? 0));
-                    $sheetResumen->setCellValueByColumnAndRow($c++, $r, $hhmmToExcel($fila[$headersResumen['H. Trabajadas']] ?? ''));
-                    $sheetResumen->setCellValueByColumnAndRow($c++, $r, $hhmmToExcel($fila[$headersResumen['H. Exceso']] ?? ''));
-                    $sheetResumen->setCellValueByColumnAndRow($c++, $r, $hhmmToExcel($fila[$headersResumen['H. Faltantes']] ?? ''));
-                    $r++;
-                }
-
-                // Formatear hoja resumen
-                $lastRowResumen = max($r - 1, 2);
-                $lastColResumenLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count($headersResumen));
-                
-                $sheetResumen->getStyle("I2:I{$lastRowResumen}")->getNumberFormat()->setFormatCode('[h]:mm');
-                $sheetResumen->getStyle("J2:J{$lastRowResumen}")->getNumberFormat()->setFormatCode('[h]:mm');
-                $sheetResumen->getStyle("K2:K{$lastRowResumen}")->getNumberFormat()->setFormatCode('[h]:mm');
-                
-                // Cabeceras resumen
-                $sheetResumen->getStyle("A1:{$lastColResumenLetter}1")->getFont()->setBold(true);
-                $sheetResumen->getStyle("A1:{$lastColResumenLetter}1")->getFill()
-                    ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
-                    ->getStartColor()->setARGB('FFE8F4FD');
-
-                // Autosize columnas resumen
-                for ($i = 1; $i <= count($headersResumen); $i++) {
-                    $sheetResumen->getColumnDimension(\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
-                }
-
-                $sheetResumen->freezePane('A2');
-                $sheetResumen->setAutoFilter("A1:{$lastColResumenLetter}{$lastRowResumen}");
-
-                // Activar la primera hoja por defecto
-                $spreadsheet->setActiveSheetIndex(0);
-
-                // Enviar al navegador
-                $filename = 'control_horario_completo_' . date('Y-m-d_H-i-s') . '.xlsx';
-                header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-                header('Content-Disposition: attachment; filename="'.$filename.'"');
+                $filename = 'control_horario_' . date('Y-m-d_H-i-s') . '.xls';
+                header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
                 header('Cache-Control: max-age=0');
 
-                $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-                $writer->save('php://output');
+                echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+                echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+                echo ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+                echo ' xmlns:x="urn:schemas-microsoft-com:office:excel">' . "\n";
+                echo '<Styles>' . "\n";
+                echo '<Style ss:ID="header">';
+                echo '<Font ss:Bold="1"/>';
+                echo '<Interior ss:Color="#EAEFF5" ss:Pattern="Solid"/>';
+                echo '</Style>' . "\n";
+                echo '</Styles>' . "\n";
+                echo '<Worksheet ss:Name="Control Horario"><Table>' . "\n";
+
+                $headers = [
+                    'Nombre Completo','Fecha','Día Semana','Entrada','Salida',
+                    'Rol','Equipo','H. Trabajados','Exceso H.','Faltantes H.',
+                    'Festivo','Justificado'
+                ];
+                echo '<Row>';
+                foreach ($headers as $h) {
+                    echo '<Cell ss:StyleID="header"><Data ss:Type="String">' . $esc($h) . '</Data></Cell>';
+                }
+                echo '</Row>' . "\n";
+
+                foreach ($datos as $f) {
+                    echo '<Row>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($f['full_name']        ?? '') . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc(substr($f['date'] ?? '', 0, 10)) . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($f['dia_semana']       ?? '') . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($timeHHMM($f['clock_in']  ?? '')) . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($timeHHMM($f['clock_out'] ?? '')) . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($f['role_name']        ?? '') . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($f['Equipo']           ?? '') . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($minToHHMM($f['minutos_trabajados'] ?? 0)) . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($minToHHMM($f['exceso_min']         ?? 0)) . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($minToHHMM($f['faltantes_min']      ?? 0)) . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($boolSiNo($f['Festivo']    ?? '')) . '</Data></Cell>';
+                    echo '<Cell><Data ss:Type="String">' . $esc($boolSiNo($f['Justificado'] ?? '')) . '</Data></Cell>';
+                    echo '</Row>' . "\n";
+                }
+
+                echo '</Table></Worksheet></Workbook>';
                 exit;
 
             } catch (\Throwable $e) {
@@ -905,13 +763,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
     <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- Script de filtros -->
-    <script src="js/Filtros.js"></script>
+    <script src="js/Filtros.js?v=<?= filemtime(__DIR__.'/js/Filtros.js') ?>"></script>
     <!-- Script de menu -->
-    <script src="js/user-menu.js"></script>
+    <script src="js/user-menu.js?v=<?= filemtime(__DIR__.'/js/user-menu.js') ?>"></script>
     <!-- NUEVO: Script del gestor de vistas -->
-    <script src="js/ViewManager.js"></script>
+    <script src="js/ViewManager.js?v=<?= filemtime(__DIR__.'/js/ViewManager.js') ?>"></script>
     <!-- NUEVO: Script de totales AL FINAL -->
-    <script src="js/totals-row.js"></script>
+    <script src="js/totals-row.js?v=<?= filemtime(__DIR__.'/js/totals-row.js') ?>"></script>
 
 </head>
 <body>
@@ -927,7 +785,18 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
         <!-- Header con título y menú de usuario -->
         <div class="header-container">
             <h1>Control Horario</h1>
-            
+
+            <!-- Botones admin -->
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button id="btn-solicitudes" onclick="abrirModalSolicitudes()" style="position:relative;background:#587587;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-inbox"></i> Solicitudes
+                    <span id="badge-solicitudes" style="display:none;position:absolute;top:-6px;right:-6px;background:#dc3545;color:white;border-radius:50%;width:18px;height:18px;font-size:0.65rem;display:none;align-items:center;justify-content:center;font-weight:700;"></span>
+                </button>
+                <button onclick="abrirModalUsuarios()" style="background:#587587;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <i class="fas fa-users"></i> Usuarios
+                </button>
+            </div>
+
             <!-- Menú de usuario -->
             <div class="user-menu-container">
                 <button class="user-menu-trigger" id="user-menu-trigger" title="Menú de usuario"></button>
@@ -1118,5 +987,264 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
             <div id="table-pagination"></div>
         </div>
     </div>
+
+<!-- =================== MODAL USUARIOS =================== -->
+<div id="modal-usuarios" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;overflow-y:auto;">
+  <div style="background:white;border-radius:16px;max-width:820px;margin:40px auto;padding:32px;position:relative;">
+    <button onclick="cerrarModal('modal-usuarios')" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;">&times;</button>
+    <h2 style="color:#587587;margin-bottom:24px;font-size:1.2rem;"><i class="fas fa-users"></i> Gestión de Usuarios</h2>
+
+    <!-- Formulario crear usuario -->
+    <div style="background:#f8f9fa;border-radius:10px;padding:20px;margin-bottom:24px;">
+      <h3 style="font-size:0.9rem;color:#555;margin-bottom:14px;text-transform:uppercase;letter-spacing:0.05em;">Crear nuevo usuario</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;" id="form-crear-usuario">
+        <div><label style="font-size:0.75rem;color:#666;display:block;margin-bottom:4px;">Usuario *</label><input id="nu-username" type="text" placeholder="nombre.usuario" style="width:100%;padding:8px 10px;border:2px solid #ddd;border-radius:6px;font-size:0.88rem;"></div>
+        <div><label style="font-size:0.75rem;color:#666;display:block;margin-bottom:4px;">Nombre completo *</label><input id="nu-nombre" type="text" placeholder="Nombre Apellido" style="width:100%;padding:8px 10px;border:2px solid #ddd;border-radius:6px;font-size:0.88rem;"></div>
+        <div><label style="font-size:0.75rem;color:#666;display:block;margin-bottom:4px;">Contraseña *</label><input id="nu-password" type="password" placeholder="Mín. 6 caracteres" style="width:100%;padding:8px 10px;border:2px solid #ddd;border-radius:6px;font-size:0.88rem;"></div>
+        <div><label style="font-size:0.75rem;color:#666;display:block;margin-bottom:4px;">Email</label><input id="nu-email" type="email" placeholder="correo@empresa.com" style="width:100%;padding:8px 10px;border:2px solid #ddd;border-radius:6px;font-size:0.88rem;"></div>
+        <div><label style="font-size:0.75rem;color:#666;display:block;margin-bottom:4px;">Equipo</label><input id="nu-equipo" type="text" placeholder="Departamento" style="width:100%;padding:8px 10px;border:2px solid #ddd;border-radius:6px;font-size:0.88rem;"></div>
+        <div><label style="font-size:0.75rem;color:#666;display:block;margin-bottom:4px;">Rol</label>
+          <select id="nu-role" style="width:100%;padding:8px 10px;border:2px solid #ddd;border-radius:6px;font-size:0.88rem;">
+            <option value="empleado">Empleado</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <button onclick="crearUsuario()" style="margin-top:14px;background:#587587;color:white;border:none;border-radius:8px;padding:9px 20px;font-size:0.88rem;cursor:pointer;font-weight:600;">
+        <i class="fas fa-plus"></i> Crear Usuario
+      </button>
+      <span id="msg-crear" style="margin-left:12px;font-size:0.82rem;"></span>
+    </div>
+
+    <!-- Lista de usuarios -->
+    <div id="tabla-usuarios-container">
+      <p style="color:#aaa;font-size:0.88rem;">Cargando usuarios...</p>
+    </div>
+  </div>
+</div>
+
+<!-- =================== MODAL SOLICITUDES =================== -->
+<div id="modal-solicitudes" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;overflow-y:auto;">
+  <div style="background:white;border-radius:16px;max-width:900px;margin:40px auto;padding:32px;position:relative;">
+    <button onclick="cerrarModal('modal-solicitudes')" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;">&times;</button>
+    <h2 style="color:#587587;margin-bottom:20px;font-size:1.2rem;"><i class="fas fa-inbox"></i> Solicitudes de Empleados</h2>
+
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <button class="sol-tab active" onclick="cargarSolicitudes('pendiente',this)" style="padding:7px 16px;border-radius:6px;border:2px solid #587587;background:#587587;color:white;cursor:pointer;font-size:0.82rem;font-weight:600;">Pendientes</button>
+      <button class="sol-tab" onclick="cargarSolicitudes('aprobada',this)" style="padding:7px 16px;border-radius:6px;border:2px solid #ddd;background:white;color:#555;cursor:pointer;font-size:0.82rem;">Aprobadas</button>
+      <button class="sol-tab" onclick="cargarSolicitudes('rechazada',this)" style="padding:7px 16px;border-radius:6px;border:2px solid #ddd;background:white;color:#555;cursor:pointer;font-size:0.82rem;">Rechazadas</button>
+      <button class="sol-tab" onclick="cargarSolicitudes('todas',this)" style="padding:7px 16px;border-radius:6px;border:2px solid #ddd;background:white;color:#555;cursor:pointer;font-size:0.82rem;">Todas</button>
+    </div>
+
+    <div id="lista-solicitudes-admin"><p style="color:#aaa;font-size:0.88rem;">Cargando...</p></div>
+  </div>
+</div>
+
+<script>
+// ============ MODALES ============
+function cerrarModal(id) { document.getElementById(id).style.display = 'none'; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { cerrarModal('modal-usuarios'); cerrarModal('modal-solicitudes'); } });
+
+// Cerrar al clic en overlay
+['modal-usuarios','modal-solicitudes'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => { if (e.target.id === id) cerrarModal(id); });
+});
+
+// ============ BADGE SOLICITUDES PENDIENTES ============
+async function actualizarBadgeSolicitudes() {
+  try {
+    const r = await fetch('api/solicitudes_admin.php?accion=pendientes_count');
+    const d = await r.json();
+    const badge = document.getElementById('badge-solicitudes');
+    if (d.ok && d.count > 0) {
+      badge.textContent = d.count;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e) {}
+}
+actualizarBadgeSolicitudes();
+
+// ============ MODAL USUARIOS ============
+function abrirModalUsuarios() {
+  document.getElementById('modal-usuarios').style.display = 'block';
+  cargarUsuarios();
+}
+
+async function cargarUsuarios() {
+  const r = await fetch('api/usuarios_admin.php?accion=listar');
+  const d = await r.json();
+  if (!d.ok) return;
+  const cont = document.getElementById('tabla-usuarios-container');
+  if (!d.usuarios.length) { cont.innerHTML = '<p style="color:#aaa;font-size:0.88rem;">No hay usuarios</p>'; return; }
+
+  const roleColor = { admin: '#587587', empleado: '#28a745' };
+  const rows = d.usuarios.map(u => `
+    <tr style="border-bottom:1px solid #f0f4f7;">
+      <td style="padding:10px 8px;font-size:0.88rem;font-weight:600;">${esc(u.nombre_completo)}</td>
+      <td style="padding:10px 8px;font-size:0.82rem;color:#666;">@${esc(u.username)}</td>
+      <td style="padding:10px 8px;font-size:0.82rem;color:#666;">${esc(u.equipo||'—')}</td>
+      <td style="padding:10px 8px;"><span style="background:${roleColor[u.role]||'#999'};color:white;padding:2px 10px;border-radius:10px;font-size:0.72rem;font-weight:700;">${u.role}</span></td>
+      <td style="padding:10px 8px;"><span style="color:${u.activo?'#28a745':'#dc3545'};font-size:0.82rem;font-weight:600;">${u.activo?'Activo':'Inactivo'}</span></td>
+      <td style="padding:10px 8px;">
+        <button onclick="editarUsuario(${u.id},'${esc(u.nombre_completo)}','${esc(u.email||'')}','${esc(u.equipo||'')}','${u.role}',${u.activo})"
+          style="background:#587587;color:white;border:none;border-radius:5px;padding:4px 10px;font-size:0.75rem;cursor:pointer;margin-right:4px;">
+          <i class="fas fa-edit"></i>
+        </button>
+        ${u.username !== 'admin' ? `<button onclick="eliminarUsuario(${u.id},'${esc(u.nombre_completo)}')"
+          style="background:#dc3545;color:white;border:none;border-radius:5px;padding:4px 10px;font-size:0.75rem;cursor:pointer;">
+          <i class="fas fa-user-slash"></i></button>` : ''}
+      </td>
+    </tr>`).join('');
+
+  cont.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr style="background:#f8f9fa;">
+      <th style="padding:8px;font-size:0.78rem;color:#666;text-align:left;text-transform:uppercase;">Nombre</th>
+      <th style="padding:8px;font-size:0.78rem;color:#666;text-align:left;">Usuario</th>
+      <th style="padding:8px;font-size:0.78rem;color:#666;text-align:left;">Equipo</th>
+      <th style="padding:8px;font-size:0.78rem;color:#666;text-align:left;">Rol</th>
+      <th style="padding:8px;font-size:0.78rem;color:#666;text-align:left;">Estado</th>
+      <th style="padding:8px;font-size:0.78rem;color:#666;text-align:left;">Acciones</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function crearUsuario() {
+  const data = new FormData();
+  data.append('accion',   'crear');
+  data.append('username', document.getElementById('nu-username').value.trim());
+  data.append('nombre',   document.getElementById('nu-nombre').value.trim());
+  data.append('password', document.getElementById('nu-password').value);
+  data.append('email',    document.getElementById('nu-email').value.trim());
+  data.append('equipo',   document.getElementById('nu-equipo').value.trim());
+  data.append('role',     document.getElementById('nu-role').value);
+
+  const msg = document.getElementById('msg-crear');
+  const r = await fetch('api/usuarios_admin.php', { method:'POST', body:data });
+  const d = await r.json();
+  if (d.ok) {
+    msg.style.color = '#28a745'; msg.textContent = '✅ Usuario creado';
+    document.querySelectorAll('#form-crear-usuario input, #form-crear-usuario select').forEach(el => el.value = '');
+    await cargarUsuarios();
+  } else {
+    msg.style.color = '#dc3545'; msg.textContent = '❌ ' + d.error;
+  }
+  setTimeout(() => msg.textContent = '', 3000);
+}
+
+function editarUsuario(id, nombre, email, equipo, role, activo) {
+  const nuevoNombre = prompt('Nombre completo:', nombre);
+  if (nuevoNombre === null) return;
+  const nuevoEquipo = prompt('Equipo:', equipo);
+  if (nuevoEquipo === null) return;
+  const nuevoRole = prompt('Rol (admin/empleado):', role);
+  if (nuevoRole === null || !['admin','empleado'].includes(nuevoRole)) { alert('Rol inválido'); return; }
+  const nuevoActivo = confirm('¿Usuario activo?') ? 1 : 0;
+
+  const data = new FormData();
+  data.append('accion', 'editar');
+  data.append('id', id);
+  data.append('nombre', nuevoNombre);
+  data.append('email', email);
+  data.append('equipo', nuevoEquipo);
+  data.append('role', nuevoRole);
+  data.append('activo', nuevoActivo);
+
+  fetch('api/usuarios_admin.php', { method:'POST', body:data })
+    .then(r => r.json()).then(d => {
+      if (d.ok) cargarUsuarios();
+      else alert('Error: ' + d.error);
+    });
+}
+
+function eliminarUsuario(id, nombre) {
+  if (!confirm(`¿Desactivar al usuario "${nombre}"?`)) return;
+  const data = new FormData();
+  data.append('accion', 'eliminar');
+  data.append('id', id);
+  fetch('api/usuarios_admin.php', { method:'POST', body:data })
+    .then(r => r.json()).then(d => {
+      if (d.ok) cargarUsuarios();
+      else alert('Error: ' + d.error);
+    });
+}
+
+// ============ MODAL SOLICITUDES ============
+function abrirModalSolicitudes() {
+  document.getElementById('modal-solicitudes').style.display = 'block';
+  cargarSolicitudes('pendiente', document.querySelector('.sol-tab.active'));
+}
+
+async function cargarSolicitudes(estado, btn) {
+  document.querySelectorAll('.sol-tab').forEach(b => {
+    b.style.background = 'white'; b.style.color = '#555'; b.style.borderColor = '#ddd'; b.classList.remove('active');
+  });
+  if (btn) { btn.style.background = '#587587'; btn.style.color = 'white'; btn.style.borderColor = '#587587'; btn.classList.add('active'); }
+
+  const r = await fetch(`api/solicitudes_admin.php?accion=listar&estado=${estado}`);
+  const d = await r.json();
+  const cont = document.getElementById('lista-solicitudes-admin');
+  if (!d.ok || !d.solicitudes.length) {
+    cont.innerHTML = '<p style="color:#aaa;font-size:0.88rem;padding:20px 0;">No hay solicitudes en este estado</p>';
+    return;
+  }
+
+  const iconos   = { vacaciones:'🏖️', justificacion:'📄', libre_disposicion:'📅' };
+  const etiq     = { vacaciones:'Vacaciones', justificacion:'Justificación', libre_disposicion:'Libre Disposición' };
+  const estColor = { pendiente:'#856404,#fff3cd', aprobada:'#155724,#d4edda', rechazada:'#721c24,#f8d7da' };
+
+  cont.innerHTML = d.solicitudes.map(s => {
+    const [tc, bg] = (estColor[s.estado] || '').split(',');
+    const fecha = s.fecha_fin ? `${s.fecha_inicio} → ${s.fecha_fin}` : s.fecha_inicio;
+    const acciones = s.estado === 'pendiente' ? `
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <input type="text" placeholder="Nota (opcional)" id="nota-${s.id}" style="flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:0.78rem;">
+        <button onclick="resolverSolicitud(${s.id},'aprobada')" style="background:#28a745;color:white;border:none;border-radius:5px;padding:5px 12px;font-size:0.78rem;cursor:pointer;">✅ Aprobar</button>
+        <button onclick="resolverSolicitud(${s.id},'rechazada')" style="background:#dc3545;color:white;border:none;border-radius:5px;padding:5px 12px;font-size:0.78rem;cursor:pointer;">❌ Rechazar</button>
+      </div>` : s.admin_nota ? `<div style="font-size:0.78rem;color:#888;margin-top:4px;">Nota: ${esc(s.admin_nota)}</div>` : '';
+
+    return `<div style="padding:14px;border:1px solid #e9ecef;border-radius:8px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">${iconos[s.tipo]||'📋'}</span>
+          <div>
+            <div style="font-size:0.88rem;font-weight:600;">${esc(s.nombre_completo)} <span style="color:#888;font-weight:400;">(${esc(s.equipo||'—')})</span></div>
+            <div style="font-size:0.8rem;color:#666;">${etiq[s.tipo]||s.tipo} · ${fecha}</div>
+            ${s.motivo ? `<div style="font-size:0.78rem;color:#888;margin-top:2px;">${esc(s.motivo)}</div>` : ''}
+            ${s.documento ? `<a href="api/descargar_documento.php?f=${encodeURIComponent(s.documento)}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;margin-top:4px;font-size:0.78rem;color:#587587;text-decoration:none;font-weight:600;"><i class="fas fa-paperclip"></i> Ver documento adjunto</a>` : ''}
+          </div>
+        </div>
+        <span style="color:${tc};background:${bg};padding:3px 12px;border-radius:12px;font-size:0.72rem;font-weight:700;text-transform:uppercase;">${s.estado}</span>
+      </div>
+      ${acciones}
+    </div>`;
+  }).join('');
+}
+
+async function resolverSolicitud(id, decision) {
+  const nota = document.getElementById('nota-'+id)?.value || '';
+  const data = new FormData();
+  data.append('accion', 'resolver');
+  data.append('id', id);
+  data.append('decision', decision);
+  data.append('nota', nota);
+  const r = await fetch('api/solicitudes_admin.php', { method:'POST', body:data });
+  const d = await r.json();
+  if (d.ok) {
+    await actualizarBadgeSolicitudes();
+    await cargarSolicitudes(document.querySelector('.sol-tab.active')?.dataset?.estado || 'pendiente', null);
+    // recargar con tab activo
+    const tab = document.querySelector('.sol-tab.active');
+    cargarSolicitudes('pendiente', document.querySelector('.sol-tab'));
+  } else alert('Error: ' + d.error);
+}
+
+// Utilidad escape HTML
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+</script>
+
 </body>
 </html>

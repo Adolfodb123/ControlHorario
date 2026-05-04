@@ -64,6 +64,7 @@ if (isset($_POST['login'])) {
             box-shadow: 0 20px 60px rgba(0,0,0,0.2);
             padding: 48px 40px;
             width: 360px;
+            max-width: calc(100vw - 32px);
         }
         .logo {
             text-align: center;

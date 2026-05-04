@@ -752,6 +752,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
     <link rel="stylesheet" type="text/css" href="css/totals-row.css">
     <!-- NUEVO: CSS de checkboxes -->
     <link rel="stylesheet" type="text/css" href="css/checkboxes.css">
+    <!-- Responsive -->
+    <link rel="stylesheet" type="text/css" href="css/responsive.css?v=<?= filemtime(__DIR__.'/css/responsive.css') ?>">
         
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

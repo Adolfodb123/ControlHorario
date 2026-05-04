@@ -241,6 +241,27 @@ $usuarioId = (int)$_SESSION['usuario_id'];
         .color-warn { color: #d97706; }
         .color-low  { color: #dc3545; }
 
+        /* ── Responsive empleado ── */
+        @media (max-width: 540px) {
+            .main { padding: 0 10px; margin: 16px auto; }
+            .fichaje-card { padding: 22px 16px; }
+            .fichaje-card .clock-display { font-size: 2.2rem; }
+            .btn-fichar { padding: 13px 30px; font-size: 0.95rem; }
+            .balance-card { padding: 16px; }
+            .balance-item { padding: 0 8px; min-width: 100px; }
+            .balance-restantes { font-size: 1.6rem; }
+            .panel { padding: 18px; }
+        }
+
+        @media (max-width: 400px) {
+            .topbar h1 { font-size: 0.95rem; }
+            .topbar .user-info span { display: none; }
+            .fichaje-card .clock-display { font-size: 1.9rem; }
+            .balance-card { flex-direction: column; gap: 12px; }
+            .balance-item { border-right: none; border-bottom: 1px solid #f0f4f7; padding-bottom: 12px; }
+            .balance-item:last-child { border-bottom: none; padding-bottom: 0; }
+        }
+
         /* ── Toast ── */
         .toast {
             position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);

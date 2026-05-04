@@ -1,0 +1,215 @@
+/* =============================================
+   RESPONSIVE.CSS — Control Horario Admin
+   ============================================= */
+
+/* ── Tablet (≤ 900px) ────────────────────────── */
+@media (max-width: 900px) {
+
+    /* Permitir scroll vertical en la página */
+    body {
+        height: auto !important;
+        overflow: auto !important;
+        padding: 10px;
+    }
+
+    .container {
+        height: auto !important;
+        overflow: visible !important;
+        min-height: calc(100vh - 20px);
+    }
+
+    /* Tabla: scroll horizontal */
+    .table-scroll-wrapper {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table-container {
+        overflow: visible !important;
+        min-height: 300px;
+    }
+
+    /* Bottom controls: wrap */
+    .table-controls-bottom {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Header: wrap si hay muchos elementos */
+    .header-container {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+}
+
+/* ── Mobile (≤ 640px) ────────────────────────── */
+@media (max-width: 640px) {
+
+    body { padding: 6px; }
+
+    .container {
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    /* ─── Header ─── */
+    .header-container {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 0 4px;
+    }
+
+    .header-container h1 {
+        font-size: 1.2rem;
+        flex: 1;
+        min-width: 120px;
+    }
+
+    /* Botones admin (Solicitudes / Usuarios) */
+    .header-container > div[style] button {
+        padding: 6px 10px !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* Ocultar texto en botones admin, dejar solo icono */
+    .header-container > div[style] button .fas,
+    .header-container > div[style] button i {
+        margin: 0 !important;
+    }
+
+    /* ─── Filtros ─── */
+    .controls {
+        padding: 8px;
+        margin-bottom: 10px;
+    }
+
+    .controls-row {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        gap: 8px;
+    }
+
+    .controls-row::-webkit-scrollbar { height: 4px; }
+    .controls-row::-webkit-scrollbar-thumb { background: rgba(88,117,135,0.4); border-radius: 4px; }
+
+    .filter-group label { font-size: 11px; }
+
+    .btn-dd {
+        padding: 5px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    /* Botones Limpiar / Aplicar Filtros */
+    .controls-row button:not(.btn-dd) {
+        padding: 5px 10px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    /* ─── Paneles desplegables (dropdowns) ─── */
+    .dd-panel {
+        width: calc(100vw - 24px) !important;
+        max-width: 340px;
+        left: 0 !important;
+        right: auto !important;
+    }
+
+    /* Si el panel sale por la derecha, invertir */
+    .multi-dd:last-child .dd-panel,
+    .multi-dd:nth-last-child(-n+2) .dd-panel {
+        left: auto !important;
+        right: 0 !important;
+    }
+
+    /* ─── Tabla ─── */
+    table.dataTable thead th,
+    table.dataTable tbody td {
+        font-size: 11px;
+        padding: 5px 4px;
+        white-space: nowrap;
+    }
+
+    /* ─── Bottom controls ─── */
+    .table-controls-bottom {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 8px;
+    }
+
+    .bottom-left-controls {
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+    }
+
+    .dataTables_paginate {
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+
+    .dataTables_paginate .paginate_button {
+        padding: 3px 6px !important;
+        font-size: 11px !important;
+    }
+
+    .dataTables_info {
+        font-size: 11px !important;
+    }
+
+    /* ─── Vista General button ─── */
+    .view-buttons .view-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+
+    /* ─── Títuloh1 ─── */
+    h1 { font-size: 1.3em; }
+
+    /* ─── Modales ─── */
+    #modal-usuarios > div,
+    #modal-solicitudes > div {
+        margin: 10px !important;
+        padding: 18px !important;
+        border-radius: 12px !important;
+    }
+
+    #form-crear-usuario {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Tabla de usuarios dentro del modal */
+    #tabla-usuarios-container table {
+        font-size: 12px;
+        min-width: 480px;
+    }
+
+    #tabla-usuarios-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* ── Móvil pequeño (≤ 420px) ─────────────────── */
+@media (max-width: 420px) {
+    .header-container h1 { font-size: 1rem; }
+
+    /* Ocultar texto de botones header, solo icono */
+    #btn-solicitudes span:not(.fas):not([id*="badge"]),
+    #btn-solicitudes .fas ~ * { display: none; }
+
+    .btn-dd { font-size: 11px; padding: 4px 7px; }
+
+    table.dataTable thead th,
+    table.dataTable tbody td {
+        font-size: 10px;
+        padding: 4px 3px;
+    }
+}
